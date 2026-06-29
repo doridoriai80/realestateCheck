@@ -20,6 +20,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -41,6 +42,28 @@ public class AptTradeService {
     }
 
     public AptTradeResponse fetch(String lawdCd, String dealYmd, int pageNo, int numOfRows) throws Exception {
+        // Upstream returns items in no guaranteed order, so sorting only within a page
+        // leaked newer trades onto later pages. Pull the full month in one call, sort
+        // across the whole set, then slice the requested page.
+        AptTradeResponse all = fetchRaw(lawdCd, dealYmd, 1, 9999);
+        List<AptTradeItem> sorted = all.getItems();
+        sorted.sort(Comparator.comparing(AptTradeService::dealDateKey).reversed());
+
+        int total = sorted.size();
+        int from = Math.max(0, Math.min((pageNo - 1) * numOfRows, total));
+        int to = Math.min(from + numOfRows, total);
+
+        AptTradeResponse out = new AptTradeResponse();
+        out.setResultCode(all.getResultCode());
+        out.setResultMsg(all.getResultMsg());
+        out.setTotalCount(total);
+        out.setPageNo(pageNo);
+        out.setNumOfRows(numOfRows);
+        out.setItems(new ArrayList<>(sorted.subList(from, to)));
+        return out;
+    }
+
+    private AptTradeResponse fetchRaw(String lawdCd, String dealYmd, int pageNo, int numOfRows) throws Exception {
         String url = baseUrl
                 + "?serviceKey=" + URLEncoder.encode(serviceKey, StandardCharsets.UTF_8)
                 + "&LAWD_CD=" + URLEncoder.encode(lawdCd, StandardCharsets.UTF_8)
@@ -58,6 +81,16 @@ public class AptTradeService {
         byte[] body = httpResponse.body();
 
         return parseXml(body);
+    }
+
+    static String dealDateKey(AptTradeItem it) {
+        return padLeft(it.getDealYear(), 4) + padLeft(it.getDealMonth(), 2) + padLeft(it.getDealDay(), 2);
+    }
+
+    private static String padLeft(String s, int n) {
+        String v = s == null ? "" : s.trim();
+        if (v.length() >= n) return v;
+        return "0".repeat(n - v.length()) + v;
     }
 
     private AptTradeResponse parseXml(byte[] xml) throws Exception {

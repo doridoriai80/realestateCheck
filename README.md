@@ -79,7 +79,7 @@ public-data.api.service-key=발급받은_인증키
 ./mvnw spring-boot:run
 ```
 
-기본 포트: `http://localhost:8080`
+기본 포트: `http://localhost:8082`
 
 ## 화면 사용 흐름
 

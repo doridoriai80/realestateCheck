@@ -82,9 +82,11 @@
         }
         const region = regionsCache[Number(idx)];
         sigunguSelect.appendChild(makeOption("", "시 · 군 · 구 선택"));
-        region.districts.forEach((d) => {
-            sigunguSelect.appendChild(makeOption(d.code, d.name));
-        });
+        [...region.districts]
+            .sort((a, b) => a.name.localeCompare(b.name, "ko"))
+            .forEach((d) => {
+                sigunguSelect.appendChild(makeOption(d.code, d.name));
+            });
         sigunguSelect.disabled = false;
     });
 
